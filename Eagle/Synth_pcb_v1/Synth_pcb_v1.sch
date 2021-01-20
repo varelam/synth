@@ -8897,15 +8897,16 @@ Source: http://www.mouser.com/ds/2/392/products_18-2245.pdf</description>
 </net>
 <net name="CONTROL_OSC1" class="0">
 <segment>
-<pinref part="ARDUINO_NANO1" gate="G$1" pin="D6"/>
-<wire x1="71.12" y1="58.42" x2="76.2" y2="55.88" width="0.1524" layer="91"/>
-<label x="76.2" y="55.88" size="1.778" layer="95" xref="yes"/>
-<junction x="71.12" y="58.42"/>
-</segment>
-<segment>
 <pinref part="R5" gate="G$1" pin="2"/>
 <wire x1="162.56" y1="63.5" x2="154.94" y2="63.5" width="0.1524" layer="91"/>
 <label x="154.94" y="63.5" size="1.778" layer="95" rot="R180" xref="yes"/>
+</segment>
+<segment>
+<pinref part="ARDUINO_NANO1" gate="G$1" pin="D8"/>
+<wire x1="71.12" y1="63.5" x2="76.2" y2="66.04" width="0.1524" layer="91"/>
+<label x="76.2" y="66.04" size="1.778" layer="95" xref="yes"/>
+<label x="299.72" y="60.96" size="1.778" layer="95" rot="R180" xref="yes"/>
+<junction x="71.12" y="63.5"/>
 </segment>
 </net>
 <net name="CONTROL_OSC2" class="0">
@@ -8924,16 +8925,15 @@ Source: http://www.mouser.com/ds/2/392/products_18-2245.pdf</description>
 </net>
 <net name="CONTROL_OSC3" class="0">
 <segment>
-<pinref part="ARDUINO_NANO1" gate="G$1" pin="D8"/>
-<wire x1="71.12" y1="63.5" x2="76.2" y2="66.04" width="0.1524" layer="91"/>
-<label x="76.2" y="66.04" size="1.778" layer="95" xref="yes"/>
-<label x="299.72" y="60.96" size="1.778" layer="95" rot="R180" xref="yes"/>
-<junction x="71.12" y="63.5"/>
-</segment>
-<segment>
 <wire x1="299.72" y1="60.96" x2="304.8" y2="60.96" width="0.1524" layer="91"/>
 <pinref part="R21" gate="G$1" pin="2"/>
 <junction x="304.8" y="60.96"/>
+</segment>
+<segment>
+<pinref part="ARDUINO_NANO1" gate="G$1" pin="D6"/>
+<wire x1="71.12" y1="58.42" x2="76.2" y2="55.88" width="0.1524" layer="91"/>
+<label x="76.2" y="55.88" size="1.778" layer="95" xref="yes"/>
+<junction x="71.12" y="58.42"/>
 </segment>
 </net>
 <net name="TRIGGER_TRI" class="0">
