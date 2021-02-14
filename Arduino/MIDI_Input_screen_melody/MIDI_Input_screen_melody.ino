@@ -17,20 +17,31 @@
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
 
+#define TRIGGER_OUT 2   // Pin for triangular wave trigger
+
 //Create an instance of the library with default name, serial port and settings
 MIDI_CREATE_DEFAULT_INSTANCE();
 
-// Define oscillator addresses and 
-
+// Define oscillator addresses and such
 #define NR_OSC 3     // Nr of oscillators
-#define OSC1 6       // Oscilator 1 is digital pin 6
+#define OSC1 8       // Oscilator 1 is digital pin 8
 #define OSC2 7       // Oscilator 2 is digital pin 7
-#define OSC3 8       // Oscilator 3 is digital pin 8
-
+#define OSC3 6       // Oscilator 3 is digital pin 6
 Tone notePlayer[NR_OSC];   //[3] = 3 OSC (MAX)
 
-int OSC_TABLE[NR_OSC]; // Create global variable for handling oscillator conflicts
-int OSC_PTR[NR_OSC];   // Create global variable for handling oscillator pointers
+int OSC_TABLE[NR_OSC];  // Create global variable for handling oscillator conflicts
+int OSC_PTR[NR_OSC];    // Create global variable for handling oscillator pointers
+
+bool b_trigger = false; // Controls if triangular wave is triggered or not
+
+
+int potenInput =  A0;   // Pin for potentiometer read  
+int buttonInput = A1;   // Pin for button read
+int audioInput =  A2;   // Pin for Audio In
+
+int buttonValue = 97;    // Button value
+int potenValue  = 98;    // Potentiometer value
+int audioValue  = 99;    // Potentiometer value
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////// Pre-declarations //////////////////////////////////////////////////////
@@ -63,18 +74,13 @@ void scroll_logo(void) {
 
   // Scroll to center:
   display.startscrolldiagright(0x00, 0x07);
-  delay(1000);
+  delay(500);
   display.stopscroll();
-  delay(1000);
-
-  // Clear display
-  display.clearDisplay();
+  delay(500);
 }
 
-void print_MIDI(byte pitch, byte vel, int oscillator, int *OSC_TABLE)
-{
-
-  
+void print_MIDI(int oscillator, int *OSC_TABLE)
+{ 
   // Clear display
   display.clearDisplay();
 
@@ -86,37 +92,64 @@ void print_MIDI(byte pitch, byte vel, int oscillator, int *OSC_TABLE)
       display.drawLine(0, SCREEN_HEIGHT-3-OSC_TABLE[j]/2, 60, SCREEN_HEIGHT-3-OSC_TABLE[j]/2, SSD1306_WHITE);  
     }
   }
-  
 
-
-  // Print pitch
-  display.setTextSize(0.6); // Draw 2X-scale text
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(65, 0);
-  display.println(F("Note"));
-  display.setCursor(105, 0);
-  display.println(pitch);
+  // Print button value
+  display.setCursor(60, 0);
+  display.println(F("Button"));
+  display.setCursor(100, 0);
+  display.println(buttonValue);
 
   // Print Velocity
-  display.setCursor(65, 15);
-  display.println(F("Velo"));
-  display.setCursor(105, 15);
-  display.println(vel);
+  display.setCursor(60, 15);
+  display.println(F("Poten"));
+  display.setCursor(100, 15);
+  display.println(potenValue);
 
   // Print freq
-  display.setCursor(65, 30);
-  display.println(F("Freq"));
-  display.setCursor(95, 30);
-  display.println(MIDI2FREQ(pitch));
+//  display.setCursor(65, 30);
+//  display.println(F("Freq"));
+//  display.setCursor(95, 30);
+//  display.println(MIDI2FREQ(pitch));
 
   // Print oscillator
   display.setCursor(65, 45);
   display.println(F("Osc"));
-  display.setCursor(105, 45);
+  display.setCursor(100, 45);
   display.println(oscillator);
   
   display.display();
   
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////// Button Function ///////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void button_interrupt()
+{
+
+  // Clear display
+  display.clearDisplay();
+  display.setCursor(35, 30);
+
+  // If triangular wave is triggered
+  if(b_trigger)
+  {
+    digitalWrite(TRIGGER_OUT, LOW); // sets the digital pin low
+
+    // Print
+    display.println(F("SAW WAVE IS ACTIVE"));
+
+    b_trigger = false;
+  }
+  else
+  {
+    digitalWrite(TRIGGER_OUT, HIGH); // sets the digital pin high
+
+    // Print
+    display.println(F("TRI WAVE IS ACTIVE"));
+
+    b_trigger = true;
+  }
+   
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,9 +172,12 @@ void setup() {
 
   scroll_logo();    // Draw scrolling text
 
+  // Setup text for later
+  display.setTextSize(0.6); // Draw 2X-scale text
+  display.setTextColor(SSD1306_WHITE);
+
 ////////////////////////////////////// Setup MIDI ///////////////////////////////
   
-  pinMode (LED_BUILTIN, OUTPUT); // Set Arduino board pin 13 to output
   MIDI.begin(MIDI_CHANNEL_OMNI); // Initialize the Midi Library.
   // OMNI sets it to listen to all channels.. MIDI.begin(2) would set it 
   // to respond to notes on channel 2 only.
@@ -150,7 +186,6 @@ void setup() {
   // is received. In this case it's "MyHandleNoteOn".
   MIDI.setHandleNoteOff(MyHandleNoteOff); // This command tells the Midi Library 
   // to call "MyHandleNoteOff" when a NOTE OFF command is received.
-
 
   // Create table with addresses for oscillators
   OSC_PTR[0] = OSC1;
@@ -164,9 +199,26 @@ void setup() {
   }
 
   // Setup Timers for oscillators
-  notePlayer[0].begin(OSC1);    //OSC 1 - OSC 1 OUTPUT PIN 3
-  notePlayer[1].begin(OSC2);    //OSC 2 - OSC 2 OUTPUT PIN 5
-  notePlayer[2].begin(OSC3);    //OSC 3 - OSC 3 OUTPUT PIN 11
+  notePlayer[0].begin(OSC1);    //OSC 1 - OSC 1
+  notePlayer[1].begin(OSC2);    //OSC 2 - OSC 2
+  notePlayer[2].begin(OSC3);    //OSC 3 - OSC 3
+
+
+////////////////////////////////////// Setup inputs / outputs ///////////////////////////////
+  
+  pinMode(TRIGGER_OUT, OUTPUT);
+  digitalWrite(TRIGGER_OUT, LOW); // sets the digital pin out
+
+  // Protect Pin 5
+  pinMode(5, INPUT);
+
+  // pinMode (buttonInput, INPUT); // Set button to input
+//
+//  // Signal ready
+//  pinMode (LED_BUILTIN, OUTPUT); // Set Arduino board pin 13 to output
+//  digitalWrite(LED_BUILTIN,HIGH);  //Turn LED on  
+//  delay(200);
+//  digitalWrite(LED_BUILTIN,LOW);  //Turn LED off
   
 }
 
@@ -174,18 +226,37 @@ void setup() {
 ////////////////////////////////////////////// Loop Function /////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop() { // Main loop
+
   MIDI.read(); // Continuously check if Midi data has been received.
+
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////// Handle notes //////////////////////////////////////////////////////////
+////////////////////////////////////////////// Handle note ON ////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // MyHandleNoteON is the function that will be called by the Midi Library
 // when a MIDI NOTE ON message is received.
 // It will be passed bytes for Channel, Pitch, and Velocity
 void MyHandleNoteOn(byte channel, byte pitch, byte velocity) { 
-  digitalWrite(LED_BUILTIN,HIGH);  //Turn LED on
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////// Read Button  //////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // read the value from the sensor:
+  buttonValue = analogRead(buttonInput);
+  potenValue =  analogRead(potenInput);
+  
+  if(buttonValue == 0)
+  {
+    // Launch interrupt if button is pressed
+    button_interrupt();
+  }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////// Play notes  ///////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   int i = 0;  // index for oscillator
 
@@ -212,19 +283,20 @@ void MyHandleNoteOn(byte channel, byte pitch, byte velocity) {
     notePlayer[i].play(MIDI2FREQ(pitch));
 
     // Plot on screen: pitch / frequency , velocity and oscillator
-    print_MIDI(pitch, velocity, i, OSC_TABLE);
+    print_MIDI(i, OSC_TABLE);
     
   }
-
 }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////// Handle note OFF ///////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // MyHandleNoteOFF is the function that will be called by the Midi Library
 // when a MIDI NOTE OFF message is received.
 // * A NOTE ON message with Velocity = 0 will be treated as a NOTE OFF message *
 // It will be passed bytes for Channel, Pitch, and Velocity
 void MyHandleNoteOff(byte channel, byte pitch, byte velocity) { 
-  digitalWrite(LED_BUILTIN,LOW);  //Turn LED off
-
+  
   int i = 0;  // index for oscillator
 
   // Find out which oscillator is being used
