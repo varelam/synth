@@ -9,11 +9,14 @@
 // Includes for ADAFRUIT screen
 #include <SPI.h>
 #include <Wire.h>
+
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define I2C_ADDR 0x3C
+
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
 
@@ -34,7 +37,6 @@ int OSC_PTR[NR_OSC];    // Create global variable for handling oscillator pointe
 
 bool b_trigger = false; // Controls if triangular wave is triggered or not
 
-
 int potenInput =  A0;   // Pin for potentiometer read  
 int buttonInput = A1;   // Pin for button read
 int audioInput =  A2;   // Pin for Audio In
@@ -43,6 +45,11 @@ int buttonValue = 97;    // Button value
 int potenValue  = 98;    // Potentiometer value
 int audioValue  = 99;    // Potentiometer value
 
+int x_buff[NR_OSC] = {0,0,0};
+int y_buff[NR_OSC] = {0,0,0};
+
+// char notes[12][2] = {"A ","Bb","B ","C ","Db","D ","Eb","E ","F ","Gb","G ","Ab"};
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////// Pre-declarations //////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,72 +57,120 @@ int audioValue  = 99;    // Potentiometer value
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 void scroll_logo(void);
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////// MIDI to Freq /////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int MIDI2FREQ(int pitch)
 {
   double coeff = pow(2.0, ((double)pitch-69)/12);
   int freq = 440*coeff;
   return freq;
 }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////// MIDI to Note /////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+int Pitch2Note(int pitch)
+{
+  return((pitch-69) % 12);
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////// Screen Functions //////////////////////////////////////////////////////
+//////////////////////////////////////////////// Initial Logo ////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void scroll_logo(void) {
-
+  
   // Clear display
   display.clearDisplay();
 
-  display.setTextSize(1); // Draw 2X-scale text
+  // Text
+  display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(10, 0);
-  display.println(F("Varela Synth 1.0"));
+  display.setCursor(10, 5);
+  display.println(F("Varela"));
+
+  display.setCursor(30, 25);
+  display.println(F("Synth"));
+
+  display.setTextSize(0.5);
+  display.setCursor(0, 54);
+  display.println(F("1.0"));
+  display.setCursor(80, 54);
+  display.println(F("2021"));
+  
   display.display();      // Show initial text
-  delay(100);
+  // delay(100);
 
   // Scroll to center:
   display.startscrolldiagright(0x00, 0x07);
   delay(500);
   display.stopscroll();
   delay(500);
-}
-
-void print_MIDI(int oscillator, int *OSC_TABLE)
-{ 
   // Clear display
   display.clearDisplay();
+}
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////// Print MIDI ////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void print_MIDI(int oscillator, int *OSC_TABLE)
+{ 
+
+  int x = 0;
+  int y = 0;
+
+  
+  
   // Graphics for oscillators
   for (int j = 0; j<NR_OSC; j++)
   {
-    if(OSC_TABLE[j] != 0)
+
+    if (x_buff[j] >SCREEN_WIDTH-1)
     {
-      display.drawLine(0, SCREEN_HEIGHT-3-OSC_TABLE[j]/2, 60, SCREEN_HEIGHT-3-OSC_TABLE[j]/2, SSD1306_WHITE);  
+      x_buff[j] = 0;
+    }
+    else
+    {
+      x_buff[j]+=4;
+    }
+  
+    if(OSC_TABLE[j] != 0)
+    {  
+      x = x_buff[j] + 4;
+      y = SCREEN_HEIGHT - round(OSC_TABLE[j]) + 40;
+      
+      display.drawLine(x_buff[j],y_buff[j], x, y, SSD1306_WHITE);
+
+      x_buff[j] = x;
+      y_buff[j] = y;
+      
+      //display.drawPixel(x, y, SSD1306_WHITE);
+      //display.drawLine(0, SCREEN_HEIGHT-3-OSC_TABLE[j]/2, 60, SCREEN_HEIGHT-3-OSC_TABLE[j]/2, SSD1306_WHITE);  
     }
   }
 
-  // Print button value
-  display.setCursor(60, 0);
-  display.println(F("Button"));
-  display.setCursor(100, 0);
-  display.println(buttonValue);
+  if (x_buff[0] > SCREEN_WIDTH)
+  {
+    // Clear display
+    display.clearDisplay();
+  }
 
-  // Print Velocity
-  display.setCursor(60, 15);
-  display.println(F("Poten"));
-  display.setCursor(100, 15);
-  display.println(potenValue);
-
-  // Print freq
-//  display.setCursor(65, 30);
-//  display.println(F("Freq"));
-//  display.setCursor(95, 30);
-//  display.println(MIDI2FREQ(pitch));
-
-  // Print oscillator
-  display.setCursor(65, 45);
-  display.println(F("Osc"));
-  display.setCursor(100, 45);
-  display.println(oscillator);
+//  // Print button value
+//  display.setCursor(60, 0);
+//  display.println(F("Button"));
+//  display.setCursor(100, 0);
+//  display.println(buttonValue);
+//
+//  // Print Velocity
+//  display.setCursor(60, 15);
+//  display.println(F("Poten"));
+//  display.setCursor(100, 15);
+//  display.println(potenValue);
+//
+//  // Print oscillator
+//  display.setCursor(65, 45);
+//  display.println(F("Osc"));
+//  display.setCursor(100, 45);
+//  display.println(oscillator);
   
   display.display();
   
@@ -162,7 +217,7 @@ void setup() {
   Serial.begin(9600);
 
  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+  if(!display.begin(SSD1306_SWITCHCAPVCC, I2C_ADDR)) { // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
@@ -175,6 +230,26 @@ void setup() {
   // Setup text for later
   display.setTextSize(0.6); // Draw 2X-scale text
   display.setTextColor(SSD1306_WHITE);
+
+////////////////////////////////////// Setup inputs / outputs ///////////////////////////////
+  
+  pinMode(TRIGGER_OUT, OUTPUT);
+  digitalWrite(TRIGGER_OUT, LOW); // sets the digital pin out
+
+  // Protect Pin 5
+  pinMode(5, INPUT);
+  
+  // pinMode (buttonInput, INPUT); // Set button to input
+//
+  // Signal ready
+  pinMode (LED_BUILTIN, OUTPUT); // Set Arduino board pin 13 to output
+  digitalWrite(LED_BUILTIN,HIGH);  //Turn LED on  
+  delay(200);
+  digitalWrite(LED_BUILTIN,LOW);  //Turn LED off
+  delay(200);
+  digitalWrite(LED_BUILTIN,HIGH);  //Turn LED on  
+  delay(200);
+  digitalWrite(LED_BUILTIN,LOW);  //Turn LED off
 
 ////////////////////////////////////// Setup MIDI ///////////////////////////////
   
@@ -203,30 +278,13 @@ void setup() {
   notePlayer[1].begin(OSC2);    //OSC 2 - OSC 2
   notePlayer[2].begin(OSC3);    //OSC 3 - OSC 3
 
-
-////////////////////////////////////// Setup inputs / outputs ///////////////////////////////
-  
-  pinMode(TRIGGER_OUT, OUTPUT);
-  digitalWrite(TRIGGER_OUT, LOW); // sets the digital pin out
-
-  // Protect Pin 5
-  pinMode(5, INPUT);
-
-  // pinMode (buttonInput, INPUT); // Set button to input
-//
-//  // Signal ready
-//  pinMode (LED_BUILTIN, OUTPUT); // Set Arduino board pin 13 to output
-//  digitalWrite(LED_BUILTIN,HIGH);  //Turn LED on  
-//  delay(200);
-//  digitalWrite(LED_BUILTIN,LOW);  //Turn LED off
-  
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////// Loop Function /////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop() { // Main loop
-
+  
   MIDI.read(); // Continuously check if Midi data has been received.
 
 }
@@ -244,15 +302,17 @@ void MyHandleNoteOn(byte channel, byte pitch, byte velocity) {
 ////////////////////////////////////////////// Read Button  //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // read the value from the sensor:
-  buttonValue = analogRead(buttonInput);
-  potenValue =  analogRead(potenInput);
-  
-  if(buttonValue == 0)
-  {
-    // Launch interrupt if button is pressed
-    button_interrupt();
-  }
+//  // read the value from the sensor:
+//  buttonValue = analogRead(buttonInput);
+//  potenValue =  analogRead(potenInput);
+//  
+//  if(buttonValue == 0)
+//  {
+//    // Launch interrupt if button is pressed
+//    button_interrupt();
+//  }
+
+  digitalWrite(LED_BUILTIN, HIGH); // sets the digital pin out
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////// Play notes  ///////////////////////////////////////////////////////////
@@ -296,6 +356,8 @@ void MyHandleNoteOn(byte channel, byte pitch, byte velocity) {
 // * A NOTE ON message with Velocity = 0 will be treated as a NOTE OFF message *
 // It will be passed bytes for Channel, Pitch, and Velocity
 void MyHandleNoteOff(byte channel, byte pitch, byte velocity) { 
+
+  digitalWrite(LED_BUILTIN, LOW); // sets the digital pin out
   
   int i = 0;  // index for oscillator
 
