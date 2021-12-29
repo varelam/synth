@@ -1,4 +1,4 @@
-My DIY synth repository includes files for:
+# My DIY synth repository includes files for:
 - Arduino Code
 - Eagle PCB schematics and board
 - AutoCAD drawings for Panel
